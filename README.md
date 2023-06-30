@@ -84,11 +84,47 @@ A estrutura dessa biblioteca é baseada na estrutrua da biblioteca SOMPY de Moos
 ## Documentação e Exemplos
 Para exemplos de utilização documentada das funções e funcionalidades dessa biblioteca acesse o Jupyter Notebook:
 [IntraSOM: Documentação Exemplificada](exemplos/exemplos_doc.ipynb)<br>
+
+Obs: Esse notebook não é carregado via GitHub devido ao tamanho, mas pode ser acessado por qualquer IDE com suporte para Jupyter Notebooks.
+
 <div style="flex: 1; text-align: center; padding: 10px;">
   <h3>Documentação Exemplificada em Jupyter Notebook</h3>
   <img src="exemplos/images/jupyter_ex.jpg" style="max-width: 800px;">
 </div>
-Obs: Esse notebook não é carregado via GitHub devido ao tamanho, mas pode ser acessado por qualquer IDE com suporte para Jupyter Notebooks.
+
+
+### Abrir com Google Colab:
+É possível acessar e visualizar este notebook através do Google Colab:<br>
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://githubtocolab.com/InTRA-USP/IntraSOM/blob/main/examples/examples_doc.ipynb)
+
+É possível acessar e visualizar este notebook através do Google Colab:
+
+* Faça o upload do notebook e dos arquivos de dados para o seu Google Drive.
+* Abra o Google Colab (https://colab.research.google.com/) no seu navegador web.
+* Clique em "File" no menu e selecione "Open Notebook".
+* Na guia "Notebook", selecione a opção "Google Drive".
+* Navegue até o local em que você fez o upload do arquivo do notebook no seu Google Drive e selecione-o.
+* O notebook será aberto no Google Colab e você terá acesso aos arquivos do seu Google Drive dentro do notebook.
+
+Aqui está um exemplo de código que você pode usar dentro do notebook para acessar arquivos no seu Google Drive:
+```
+from google.colab import drive
+
+# Montar o Google Drive e Aceitar a Conexão
+drive.mount('/content/drive')
+
+# Acessar arquivos no Google Drive
+file_path = '/content/drive/MyDrive/path/to/your/file.txt'
+
+# Instalar o Intrasom
+!pip install intrasom
+
+# Ignorar avisos de versionamento
+
+# Continuar executando o notebook
+# Carregar o dataframe
+data = pd.read_excel(file_path+"data/Animais_missing.xlsx", index_col=0)
+```
 
 -----
 
