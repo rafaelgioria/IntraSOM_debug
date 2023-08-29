@@ -1259,7 +1259,8 @@ class SOM(object):
                             self.nan_value_hist.append(self.data_missing["nan_values"])
 
                         # Progress bar update
-                        QE = round(np.mean(np.sqrt(bmu[1])),4)
+                        fixed_euclidean_x2 = np.einsum('ij,ij->i', np.nan_to_num(data, nan=0.0), np.nan_to_num(data, nan=0.0))
+                        QE = round(np.mean(np.sqrt(bmu[1] + fixed_euclidean_x2)),4)
                         pbar.set_description(f"Epoch: {i+1}. Radius:{round(radius[i],2)}. QE: {QE}")
 
                     # Display imputed matrix in fine training
@@ -1341,7 +1342,8 @@ class SOM(object):
                                 self.nan_value_hist.append(self.data_missing["nan_values"])
 
                             # Progress bar update
-                            QE = round(np.mean(np.sqrt(bmu[1])),4)
+                            fixed_euclidean_x2 = np.einsum('ij,ij->i', np.nan_to_num(data[bootstrap_i], nan=0.0), np.nan_to_num(data[bootstrap_i], nan=0.0)) ## gioria
+                            QE = round(np.mean(np.sqrt(bmu[1]+fixed_euclidean_x2)),4)
                             pbar.set_description(f"Epoch: {i+1}. Radius:{round(radius[i],2)}. QE: {QE}")
 
                     if self.history_plot:
@@ -1394,7 +1396,8 @@ class SOM(object):
                             self.nan_value_hist.append(self.data_missing["nan_values"])
 
                         # Progress bar update
-                        QE = round(np.mean(np.sqrt(bmu[1])),4)
+                        fixed_euclidean_x2 = np.einsum('ij,ij->i', np.nan_to_num(data, nan=0.0), np.nan_to_num(data, nan=0.0))
+                        QE = round(np.mean(np.sqrt(bmu[1]+fixed_euclidean_x2)),4)
                         pbar.set_description(f"Epoch: {i+1}. Radius:{round(radius[i],2)}. QE: {QE}")
 
                     # Display matrix inputed in fine training
@@ -1472,7 +1475,8 @@ class SOM(object):
                                 self.nan_value_hist.append(self.data_missing["nan_values"])
 
                             # Progress bar update
-                            QE = round(np.mean(np.sqrt(bmu[1])),4)
+                            fixed_euclidean_x2 = np.einsum('ij,ij->i', np.nan_to_num(data, nan=0.0), np.nan_to_num(data, nan=0.0))
+                            QE = round(np.mean(np.sqrt(bmu[1] + fixed_eclidean_x2)),4)
                             pbar.set_description(f"Epoch: {i+1}. Radius:{round(radius[i],2)}. QE: {QE}")
 
                     if self.history_plot:
