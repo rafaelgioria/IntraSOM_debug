@@ -46,7 +46,6 @@ class SOMFactory(object):
               unit_names = None,
               sample_names=None,
               missing=False,
-              save_nan_hist=False,
               pred_size=0,
               dist_factor = 2, 
               pace_size=500):
@@ -156,7 +155,6 @@ class SOMFactory(object):
                    unit_names = unit_names,
                    sample_names = sample_names,
                    missing = missing,
-                   save_nan_hist=save_nan_hist,
                    pred_size = pred_size,
                    dist_factor = dist_factor,
                    pace_size=pace_size)
@@ -248,7 +246,6 @@ class SOM(object):
                  unit_names = None,
                  sample_names=None,
                  missing=False,
-                 save_nan_hist=False,
                  missing_imput=None,
                  pred_size=0,
                  load_param=False,
@@ -300,8 +297,6 @@ class SOM(object):
                 sys.exit("Database with missing data, flag 'missing' as True")
             if mask is not None:
                 sys.exit("The parameter 'mask' is only used in databases with missing values, flag as None or remove this parameter")
-            if save_nan_hist is True:
-                sys.exit("The parameter 'save_nan_hist' is only used in databases with missing values, flag as False or remove this parameter")
         elif self.missing == True:
             if not np.isnan(self._data).any():
                 sys.exit("Database with no missing data, flag 'missing' as False")
@@ -327,9 +322,6 @@ class SOM(object):
         self.lattice = lattice
         self.training = training
         self.load_param = load_param
-        self.save_nan_hist = save_nan_hist
-        if save_nan_hist:
-            self.nan_value_hist = []
         self.data_proj_norm = []
 
         # Populate load type dependent attributes
@@ -1309,10 +1301,6 @@ class SOM(object):
                         # Delete the data in the data variable
                         data[self.data_missing["indices"]] = np.full(len(self.data_missing["indices"][0]), np.nan)
 
-                        if self.save_nan_hist:
-                            # Add to nan's processing history
-                            self.nan_value_hist.append(self.data_missing["nan_values"])
-
                         # Progress bar update
                         self.QE_expanded[bootstrap_i] = bmu[1]
                         self.QE = np.mean(self.QE_expanded)
@@ -1363,9 +1351,6 @@ class SOM(object):
                             # Delete the data in the data variable
                             data[self.data_missing["indices"]] = np.full(len(self.data_missing["indices"][0]), np.nan)
 
-                            if self.save_nan_hist:
-                                # Add to nan's processing history
-                                self.nan_value_hist.append(self.data_missing["nan_values"])
                         else:
                             # Find the BMU data
                             bmu = self._find_bmu(data[bootstrap_i], njb=njob, pace_size=self.pace_size)
@@ -1396,10 +1381,6 @@ class SOM(object):
 
                             # Delete the data in the data variable
                             data[self.data_missing["indices"]] = np.full(len(self.data_missing["indices"][0]), np.nan)
-
-                            if self.save_nan_hist:
-                                # Add to nan's processing history
-                                self.nan_value_hist.append(self.data_missing["nan_values"])
 
                             # Progress bar update
                             partial_qe = bmu[1]
@@ -1453,9 +1434,6 @@ class SOM(object):
 
                         # Delete the data in the data variable
                         data[self.data_missing["indices"]] = np.full(len(self.data_missing["indices"][0]), np.nan)
-                        if self.save_nan_hist:
-                            # Add to nan's processing history
-                            self.nan_value_hist.append(self.data_missing["nan_values"])
 
                         # Progress bar update
                         self.QE_expanded = bmu[1]
@@ -1497,9 +1475,6 @@ class SOM(object):
                             # Delete the data in the data variable
                             data[self.data_missing["indices"]] = np.full(len(self.data_missing["indices"][0]), np.nan)
 
-                            if self.save_nan_hist:
-                                # Add to nan's processing history
-                                self.nan_value_hist.append(self.data_missing["nan_values"])
 
                             # Progress bar update
                             fixed_euclidean_x2 = np.einsum('ij,ij->i', np.nan_to_num(data, nan=0.0), np.nan_to_num(data, nan=0.0))
@@ -1532,9 +1507,6 @@ class SOM(object):
 
                             # Delete the data in the data variable
                             data[self.data_missing["indices"]] = np.full(len(self.data_missing["indices"][0]), np.nan)
-                            if self.save_nan_hist:
-                                # Add to nan's processing history
-                                self.nan_value_hist.append(self.data_missing["nan_values"])
 
                             # Progress bar update
                             self.QE_expanded = bmu[1]
