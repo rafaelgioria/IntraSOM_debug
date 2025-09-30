@@ -1,25 +1,29 @@
-from sklearn.cluster import KMeans
+from math import sqrt
+from collections import Counter
+
+import os
+import numpy as np
+import pandas as pd
+
 from matplotlib import pyplot as plt
-import matplotlib.gridspec as gridspec
-from numpy import nanmean, dot
 import matplotlib as mpl
+import matplotlib.gridspec as gridspec
 from matplotlib.patches import RegularPolygon
 from matplotlib import cm
-import os
-from math import sqrt
+
+from sklearn.cluster import KMeans
 from sklearn.preprocessing import minmax_scale
-import numpy as np
+from sklearn.metrics import davies_bouldin_score as db
+
 from shapely.geometry import Polygon, Point
 from shapely.ops import unary_union
 import geopandas as gpd
-import pkg_resources
+
+from importlib import resources
 from PIL import Image
 from tqdm.notebook import tqdm
-from sklearn.metrics import davies_bouldin_score as db
-import pandas as pd
+from tqdm import tqdm
 import plotly.graph_objects as go
-from collections import Counter
-
 
 class ClusterFactory(object):
 
@@ -36,7 +40,7 @@ class ClusterFactory(object):
         self.sample_names = som_object._sample_names
         self.build_umatrix = som_object.build_umatrix
         # Load foot image
-        image_file = pkg_resources.resource_filename('intrasom', 'images/foot.jpg')
+        image_file = resources.files("intrasom") / "images" / "foot.jpg"
         self.foot = Image.open(image_file)
 
     def kmeans(self, k=3, init = "random", n_init=5, max_iter=200):
@@ -64,90 +68,146 @@ class ClusterFactory(object):
         return kmeans.reshape(self.mapsize[1], self.mapsize[0])
     
     def Davies_Bouldin_analysis(self, 
-                                max_clust = 30, 
+                                max_clust=30, 
                                 n_iter=100, 
                                 min_type="ensamble", 
                                 plot=True, 
                                 save=False,
-                                verbose=True
-                                ):
+                                verbose=True):
         """
-        Docstring
+        DBI vs nº de clusters com tratamento robusto para casos sem 2º/3º mínimos.
         """
-        def clust_counter(clusts):
-            count = np.array(Counter(clusts).most_common())
-            count[:,1] = count[:,1]/count[:,1].sum()*100
-            return count
-        
-        # Recovery neuron matrix for analysis
-        X = self.neuron_matrix
 
-        # Normalize neuron matrix
+
+        def clust_counter(clusts):
+            # Remove None/NaN
+            cl = [c for c in clusts if c is not None and not (isinstance(c, float) and np.isnan(c))]
+            if len(cl) == 0:
+                # Retorna array vazio no mesmo formato esperado
+                return np.array([])
+            count = np.array(Counter(cl).most_common(), dtype=object)
+            total = count[:, 1].astype(float).sum()
+            if total == 0:
+                return np.array([])
+            count[:, 1] = count[:, 1].astype(float) / total * 100.0
+            return count
+
+        # --- Dados
+        X = np.asarray(self.neuron_matrix)
+
+        # Normalização robusta (evita std==0)
         mean = np.mean(X, axis=0)
         std = np.std(X, axis=0)
-        X = (X-mean)/std
+        eps = 1e-12
+        std_safe = np.where(std < eps, 1.0, std)
+        X = (X - mean) / std_safe
 
-        # Davies Bouldin Analysis
-        n_clusters = np.arange(2, max_clust+1,1)
+        # --- Varredura DBI
+        n_clusters = np.arange(2, max_clust + 1, 1)
         db_summary = {}
 
         for it in tqdm(range(n_iter)):
-            db_results = np.zeros(len(n_clusters))
+            db_results = np.zeros(len(n_clusters), dtype=float)
             db_summary[f"Iter{it+1}"] = db_results
-            for n_clust in n_clusters:
-                kmeans = KMeans(n_clusters=n_clust, 
-                                init="random",
-                                n_init = 5,
-                                max_iter=200
-                                ).fit(X)
-                db_results[n_clust-2] = db(X, kmeans.labels_)
-        
+            for idx, n_clust in enumerate(n_clusters):
+                kmeans = KMeans(
+                    n_clusters=n_clust,
+                    init="random",
+                    n_init=5,
+                    max_iter=200,
+                    random_state=None
+                ).fit(X)
+                db_results[idx] = db(X, kmeans.labels_)
+
         df = pd.DataFrame.from_dict(db_summary, orient='index', columns=n_clusters)
         if save:
             path = 'Results'
             os.makedirs(path, exist_ok=True)
             df.to_excel(f"Results/{self.name}_dbindex_iterations.xlsx")
-        
-        # Overwrite X to save space
-        X = df.values
 
-        # Minima calculation
-        f_mins = []
-        s_mins = []
-        t_mins = []
-        m_mins = []
-        max_mins = []
-        for it in X:
-            x = np.r_[True, it[1:] < it[:-1]] & np.r_[it[:-1] < it[1:], True]
-            f_min, s_min, t_min, m_min, max_min = it[x][np.argsort(it[x])[0]], it[x][np.argsort(it[x])[1]],it[x][np.argsort(it[x])[2]], it[x][np.argsort(it[x])[:][int(((len(it[x])-1)/2))]], it[x][np.argsort(it[x])[:][-1]]
-            f_mins.append(f_min)
-            s_mins.append(s_min)
-            t_mins.append(t_min)
-            m_mins.append(m_min)
-            max_mins.append(max_min)
+        # --- Cálculo de mínimos (robusto)
+        # Nota: local minima com desigualdades estritas; plateaus não contam.
+        f_mins, s_mins, t_mins, m_mins, max_mins = [], [], [], [], []
+        f_clust_min, s_clust_min, t_clust_min, m_clust_min, max_clust_min = [], [], [], [], []
 
-        f_clust_min = []
-        s_clust_min = []
-        t_clust_min = []
-        m_clust_min = []
-        max_clust_min = []
-        for i in range(len(f_mins)):
-            f_clust_min.append(df.iloc[i][df.iloc[i]==f_mins[i]].index[0])
-            s_clust_min.append(df.iloc[i][df.iloc[i]==s_mins[i]].index[0])
-            t_clust_min.append(df.iloc[i][df.iloc[i]==t_mins[i]].index[0])
-            m_clust_min.append(df.iloc[i][df.iloc[i]==m_mins[i]].index[0])
-            max_clust_min.append(df.iloc[i][df.iloc[i]==max_mins[i]].index[0])
-        sum_clust_min = f_clust_min + s_clust_min
+        for i in range(df.shape[0]):
+            it = df.iloc[i].values.astype(float)
 
+            # Índices de mínimos locais
+            loc = (np.r_[True, it[1:] < it[:-1]] & np.r_[it[:-1] < it[1:], True])
+            local_vals = it[loc]
+            local_idxs = np.where(loc)[0]
+
+            # Se não houver mínimos locais, usar mínimo global como "primeiro"
+            if local_vals.size == 0:
+                # 1º mínimo = mínimo global
+                g_idx = int(np.argmin(it))
+                g_val = it[g_idx]
+
+                f_val, f_idx = g_val, g_idx
+                s_val, s_idx = np.nan, None
+                t_val, t_idx = np.nan, None
+                m_val, m_idx = np.nan, None
+                max_val, max_idx = g_val, g_idx  # por consistência (único disponível)
+            else:
+                # Ordena mínimos locais por valor ascendente
+                order = np.argsort(local_vals)
+                sorted_vals = local_vals[order]
+                sorted_idxs = local_idxs[order]
+
+                # 1º mínimo
+                f_val, f_idx = sorted_vals[0], int(sorted_idxs[0])
+
+                # 2º e 3º se existirem
+                if len(sorted_vals) >= 2:
+                    s_val, s_idx = sorted_vals[1], int(sorted_idxs[1])
+                else:
+                    s_val, s_idx = np.nan, None
+
+                if len(sorted_vals) >= 3:
+                    t_val, t_idx = sorted_vals[2], int(sorted_idxs[2])
+                else:
+                    t_val, t_idx = np.nan, None
+
+                # Mediano dos mínimos locais (se houver ≥1)
+                mid_pos = len(sorted_vals) // 2
+                m_val = sorted_vals[mid_pos] if len(sorted_vals) > 0 else np.nan
+                m_idx = int(sorted_idxs[mid_pos]) if len(sorted_vals) > 0 else None
+
+                # Máximo entre os mínimos locais
+                max_val = sorted_vals[-1]
+                max_idx = int(sorted_idxs[-1])
+
+            # Armazena valores
+            f_mins.append(f_val); s_mins.append(s_val); t_mins.append(t_val); m_mins.append(m_val); max_mins.append(max_val)
+
+            # Mapeia para nº de clusters (coluna) — se índice existir
+            def idx_to_cluster(idx_):
+                if idx_ is None:
+                    return None
+                # df.columns são os n_clusters (2..max)
+                return int(df.columns[idx_])
+
+            f_clust_min.append(idx_to_cluster(f_idx))
+            s_clust_min.append(idx_to_cluster(s_idx))
+            t_clust_min.append(idx_to_cluster(t_idx))
+            m_clust_min.append(idx_to_cluster(m_idx))
+            max_clust_min.append(idx_to_cluster(max_idx))
+
+        # Soma para “ensemble” (só os válidos)
+        sum_clust_min = [c for c in (f_clust_min + s_clust_min) if c is not None]
+
+        # --- Plot
         if plot:
             x = df.columns.values.astype(int)
             y = df.mean().values
             y_upper = df.quantile(0.75).values
             y_lower = df.quantile(0.25).values
-            error = (y_upper-y_lower)/2
+            error = (y_upper - y_lower) / 2
 
             fig = go.Figure()
-            for i in range(df.iloc[:,:19].shape[0]):
+            # cuidado com fatia fixa (:,:19) — removido para cobrir todas as iterações
+            for i in range(df.shape[0]):
                 fig.add_trace(go.Scatter(
                     x=df.columns.values,
                     y=df.iloc[i],
@@ -156,95 +216,77 @@ class ClusterFactory(object):
                     line=dict(color="silver")
                 ))
 
-            # Confidence Interval
+            # Intervalo interquartil
             fig.add_trace(go.Scatter(
                 x=x,
                 y=y,
                 line=dict(color='rgb(0,0,0)'),
                 mode='lines',
-                name="Trendline", 
-                error_y=dict(
-                        type='data', # value of error bar given in data coordinates
-                        array=error,
-                        visible=True)
-                ))
-                
+                name="Trendline",
+                error_y=dict(type='data', array=error, visible=True)
+            ))
+
             fig.update_layout(
-                template= "simple_white",
-                title= "DBI Comparison: First and Second Global Minima",
+                template="simple_white",
+                title="DBI Comparison: First and Second Global Minima",
                 xaxis_title="Cluster Number",
                 yaxis_title="Davies-Bouldin Index",
                 width=1500,
                 height=600,
-                font=dict(
-                    size=20
-                ),
-                legend=dict(
-                    orientation="h", y=-0.2)
+                font=dict(size=20),
+                legend=dict(orientation="h", y=-0.2)
             )
 
-            fig.add_trace(go.Scatter(x=f_clust_min, y=f_mins, mode='markers', name='Global Minimum',
-                                        marker_symbol ='circle-open', marker=dict(size=10, color = '#0000FF', line=dict(width=3))))
-            fig.add_trace(go.Scatter(x=s_clust_min, y=s_mins, mode='markers', name='Second Global Minimum',
-                                        marker_symbol ='circle-open', marker=dict(size=10, color = '#DC3912', line=dict(width=3))))
-            #fig.add_trace(go.Scatter(x=t_clust_min, y=t_mins, mode='markers', name='Third to Global Minimum',
-            #                            marker_symbol ='circle-open', marker=dict(size=10, color = '#ffff00', line=dict(width=3))))
-            #fig.add_trace(go.Scatter(x=m_clust_min, y=m_mins, mode='markers', name='Average Local Minimum',
-            #                            marker_symbol ='circle-open', marker=dict(size=10, color = '#ffff00', line=dict(width=3))))
+            # Filtra pares válidos para o scatter
+            def valid_pairs(xs, ys):
+                out_x, out_y = [], []
+                for a, b in zip(xs, ys):
+                    if a is not None and np.isfinite(b):
+                        out_x.append(a); out_y.append(b)
+                return out_x, out_y
+
+            vx, vy = valid_pairs(f_clust_min, f_mins)
+            fig.add_trace(go.Scatter(x=vx, y=vy, mode='markers', name='Global Minimum',
+                                    marker_symbol='circle-open',
+                                    marker=dict(size=10, color='#0000FF', line=dict(width=3))))
+
+            vx, vy = valid_pairs(s_clust_min, s_mins)
+            fig.add_trace(go.Scatter(x=vx, y=vy, mode='markers', name='Second Global Minimum',
+                                    marker_symbol='circle-open',
+                                    marker=dict(size=10, color='#DC3912', line=dict(width=3))))
             fig.show()
 
-        # Cluster number counting
+        # --- Contagens
         fcounter = clust_counter(f_clust_min)
         scounter = clust_counter(s_clust_min)
         sumcounter = clust_counter(sum_clust_min)
 
+        # --- Saída
+        def top2_msg(counter_arr, title):
+            if counter_arr.size == 0:
+                return [f"{title}:", "Sem dados suficientes."]
+            lines = [f"{title}:"]
+            # imprime até 2 entradas, se existirem
+            for k in range(min(2, counter_arr.shape[0])):
+                lines.append(f"Cluster Number: {counter_arr[k][0]}. Percentage: {counter_arr[k][1]:.2f}%.")
+            return lines
+
         if verbose:
-            print("Davies-Bouldin results:")
+            print("Davies-Bouldin results:\n")
+            print(*top2_msg(fcounter, "First Minimum"), sep="\n")
             print("")
-            print("First Minimum:")
-            print(f"Cluster Number: {fcounter[0][0]}. Percentage: {fcounter[0][1]}%.")
-            print(f"Cluster Number: {fcounter[1][0]}. Percentage: {fcounter[1][1]}%.")
+            print(*top2_msg(scounter, "Second Minimum"), sep="\n")
             print("")
-            print("Second Minimum:")
-            print(f"Cluster Number: {scounter[0][0]}. Percentage: {scounter[0][1]}%.")
-            print(f"Cluster Number: {scounter[1][0]}. Percentage: {scounter[1][1]}%.")
-            print("")
-            print("Ensamble Minimum:")
-            print(f"Cluster Number: {sumcounter[0][0]}. Percentage: {sumcounter[0][1]}%.")
-            print(f"Cluster Number: {sumcounter[1][0]}. Percentage: {sumcounter[1][1]}%.")
+            print(*top2_msg(sumcounter, "Ensamble Minimum"), sep="\n")
         else:
-            print(f"Davies-Bouldin results:")
-            print(f"First Minimum: {fcounter[0][0]}")
-            print(f"Second Minimum: {scounter[0][0]}")
-            print(f"Ensamble Minimum: {sumcounter[0][0]}")
-    
-    def results_cluster(self, clusters, save=True, savetype="parquet"):
-        """
-        Returns a DataFrame containing the results of grouping the data, with the addition of the assigned cluster labels.
+            fm = fcounter[0][0] if fcounter.size else None
+            sm = scounter[0][0] if scounter.size else None
+            em = sumcounter[0][0] if sumcounter.size else None
+            print("Davies-Bouldin results:")
+            print(f"First Minimum: {fm}")
+            print(f"Second Minimum: {sm}")
+            print(f"Ensamble Minimum: {em}")
 
-        Args:
-            clusters (numpy.ndarray): A one-dimensional array containing the cluster labels assigned to each data point.
-            save (bool, optional): Indicates whether the results should be saved in an Excel file. The default is True.
-
-        Returns:
-            pandas.DataFrame: A DataFrame containing the results of clustering the data, including the assigned cluster labels.
-        """
-
-        df = self.neurons_dataframe.copy()
-        df[f"{clusters.max()}_clusters"] = clusters.flatten()
-        df = df.iloc[self.bmus,:]
-
-        df.set_index(self.sample_names, inplace=True)
-
-        if save:
-            path = 'Results'
-            os.makedirs(path, exist_ok=True)
-            if savetype == "xlsx":
-                df.to_excel(f"Results/{self.name}_results_{clusters.max()}_clusters.xlsx")
-            elif savetype == "parquet":
-                df.to_parquet(f"Results/{self.name}_results_{clusters.max()}_clusters.parquet")
-
-        return df
             
     def plot_kmeans(self, 
                     clusters, 

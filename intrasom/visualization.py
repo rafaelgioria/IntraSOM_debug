@@ -16,7 +16,7 @@ from textwrap import fill
 from numpy import pi, sin, cos
 from sklearn.cluster import KMeans
 from sklearn.utils import shuffle
-import pkg_resources
+from importlib import resources
 import plotly.graph_objs as go
 from scipy.ndimage import rotate
 from skimage.transform import resize
@@ -43,7 +43,7 @@ class PlotFactory(object):
         self.build_umatrix = som_object.build_umatrix
         
         # Load foot image
-        image_file = pkg_resources.resource_filename('intrasom', 'images/foot.jpg')
+        image_file = resources.files("intrasom") / "images" / "foot.jpg"
         self.foot = Image.open(image_file)
 
     # def build_umatrix(self, expanded=False, log=False):
