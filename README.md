@@ -77,8 +77,8 @@ The structure of this library is based on the structure of the SOMPY library by 
 -----
 ## Documentation and Examples
 For documented examples of usage of the functions and features of this library, please refer to the Jupyter Notebook:
-[IntraSOM: Documented Examples](exemplos/exemplos_doc.ipynb)<br>
-**Note**: This notebook is not loaded via GitHub due to its size, but it can be accessed through any IDE that supports Jupyter Notebooks.
+[IntraSOM: Documented Examples](examples/examples_doc.ipynb)<br>
+**Note**: This notebook may not be loaded via GitHub due to its size, but it can be accessed through any IDE that supports Jupyter Notebooks.
 
 <div style="flex: 1; text-align: center; padding: 10px;">
   <h3>Documented Examples in Jupyter Notebook</h3>
