@@ -8,5 +8,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: psf/black@stable
+- uses: psf/black@stable
   with:
+    options: "--check --verbose"
+    src: "./src"
     jupyter: true
+    version: "21.5b1"
