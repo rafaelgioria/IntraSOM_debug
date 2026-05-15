@@ -1,3 +1,4 @@
+![Build Status](https://github.com/rafaelgioria/IntraSOM_debug/actions/workflows/black.yml/badge.svg)  [![codecov](https://codecov.io/gh/rafaelgioria/IntraSOM_debug/branch/main/graph/badge.svg?token=YOUR_TOKEN_ID)](https://codecov.io/gh/rafaelgioria/IntraSOM_debug)
 
 <div style="text-align: center; padding: 20px;">
   <img src="intrasom/images/Logo_fundo_branco.svg" style="max-width: 600px;">
