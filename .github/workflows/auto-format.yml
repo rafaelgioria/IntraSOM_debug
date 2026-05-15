@@ -1,0 +1,55 @@
+name: Python Quality Control
+
+on:
+  push:
+    branches: [ main ] # Only run on pushes to main to avoid PR loops
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    # Necessary permissions for creating Pull Requests
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install black flake8 pytest pytest-cov
+
+      - name: Run Black (Fix layout)
+        run: black .
+
+      - name: Check PEP8 (Naming & Logic)
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          # exit-zero treats all errors as warnings for now
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+
+      - name: Run Tests & Generate Coverage
+        run: |
+          # Runs pytest and generates a coverage report in XML format
+          pytest --cov=./src --cov-report=xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }} # Required for private repos, recommended for public
+
+      - name: Create Pull Request for Style Fixes
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit_message: "style: automated PEP8 formatting"
+          title: "Fix PEP8 Styles"
+          body: "This PR was automatically generated to fix Python formatting issues."
+          branch: "fix/pep8-formatting"
+          base: main
+          delete-branch: true
